@@ -1,0 +1,20 @@
+# Canonical CI/CD config for hanzoai/esbuild — read by the hanzoai/ci reusable
+# workflow (.hanzo/workflows/cicd.yml) and by platform.hanzo.ai.
+#
+# LIBRARY: the esbuild bundler — a Go module plus the npm packages under npm/
+# that wrap the compiled binary. No image, no deploy.
+#
+# The gate is the repo's own `test-go` + `vet-go` targets: `go test
+# ./internal/... ./pkg/...` and `go vet ./cmd/... ./internal/... ./pkg/...`.
+# That is where the compiler actually lives — the lexer, parser, linker and
+# every snapshot test of generated output — and it is self-contained.
+#
+# What is NOT here, and why: the full `make test` also runs js-api-tests,
+# plugin-tests, end-to-end-tests, decorator-tests and register-test. Those build
+# the binary, npm-install several trees and shell out to node per case; they are
+# a release lane, not a merge gate. The Makefile itself splits `test` from
+# `test-all` on the same reasoning, and the split is stated here rather than
+# implied so nobody reads this gate as covering the JS API surface.
+test:
+  - name: go
+    run: make test-go vet-go
