@@ -135,6 +135,7 @@ const (
 	ES2023
 	ES2024
 	ES2025
+	ES2026
 )
 
 type Loader uint16
@@ -236,6 +237,14 @@ const (
 	LogLevelError
 )
 
+type LogStyle uint8
+
+const (
+	LogStyleDefault LogStyle = iota
+	LogStyleClang
+	LogStyleVisualStudio
+)
+
 type Charset uint8
 
 const (
@@ -280,6 +289,7 @@ const (
 type BuildOptions struct {
 	Color       StderrColor         // Documentation: https://esbuild.github.io/api/#color
 	LogLevel    LogLevel            // Documentation: https://esbuild.github.io/api/#log-level
+	LogStyle    LogStyle            // Documentation: https://esbuild.github.io/api/#log-style
 	LogLimit    int                 // Documentation: https://esbuild.github.io/api/#log-limit
 	LogOverride map[string]LogLevel // Documentation: https://esbuild.github.io/api/#log-override
 	AbsPaths    AbsPaths            // Documentation: https://esbuild.github.io/api/#abs-path
@@ -412,6 +422,7 @@ func Build(options BuildOptions) BuildResult {
 type TransformOptions struct {
 	Color       StderrColor         // Documentation: https://esbuild.github.io/api/#color
 	LogLevel    LogLevel            // Documentation: https://esbuild.github.io/api/#log-level
+	LogStyle    LogStyle            // Documentation: https://esbuild.github.io/api/#log-style
 	LogLimit    int                 // Documentation: https://esbuild.github.io/api/#log-limit
 	LogOverride map[string]LogLevel // Documentation: https://esbuild.github.io/api/#log-override
 	AbsPaths    AbsPaths            // Documentation: https://esbuild.github.io/api/#abs-path
@@ -717,6 +728,7 @@ type FormatMessagesOptions struct {
 	TerminalWidth int
 	Kind          MessageKind
 	Color         bool
+	LogStyle      LogStyle
 }
 
 func FormatMessages(msgs []Message, opts FormatMessagesOptions) []string {
