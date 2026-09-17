@@ -1,0 +1,79 @@
+name: Release
+
+# Builds what the estate ships from this fork — the native esbuild binaries and
+# the wasip1/wasm module — and attaches them to the release for a v* tag.
+#
+# Separate from cicd.yml, which is the merge gate (hanzo.yml -> hanzoai/ci ->
+# `make test-go vet-go`). A release must not be cancelled by whatever lands
+# behind it, and the gate must be; they cannot share a concurrency group.
+#
+# It builds on every push to main as well, so a tag never discovers the lane is
+# broken. Only the tag publishes.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Keyed on the ref, not the repository: a repo-wide group means pushing v0.28.3
+# cancels v0.28.2's build, leaving a tag that promises artifacts nobody can
+# pull. Re-running the same ref still supersedes its own run.
+concurrency:
+  group: release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # One job, not a matrix: every target cross-compiles from here with
+    # CGO_ENABLED=0, and the manifest has to see all five artifacts at once to
+    # digest them together. A matrix would produce five partial manifests.
+    runs-on: [linux-amd64]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Bootstrap only. hanzo/Makefile exports GOTOOLCHAIN=go$(cat go.version),
+      # so the compiler that produces the artifacts is the one this repo pins,
+      # whichever Go starts the build.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.version
+
+      - run: make -f hanzo/Makefile all
+
+      - name: Name the artifact for the version inside it
+        id: v
+        run: echo "version=$(make -f hanzo/Makefile version)" >> "$GITHUB_OUTPUT"
+
+      # v3, not v4+: this workflow runs on git.hanzo.ai, which presents as GHES,
+      # and the v4 action refuses outright — "@actions/artifact v2.0.0+ ... not
+      # currently supported on GHES". A v4 upload builds everything and then
+      # discards it at the last step, so a good build reads as a failed run.
+      - uses: actions/upload-artifact@v3
+        with:
+          name: esbuild-${{ steps.v.outputs.version }}
+          path: hanzo/dist/
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: [linux-amd64]
+    timeout-minutes: 20
+    steps:
+      # v3 for the same reason, and it must be the SAME version: a v4 download
+      # cannot read a v3 artifact even where it runs.
+      - uses: actions/download-artifact@v3
+        with:
+          path: dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          # generate_release_notes is NOT set: it calls
+          # POST <api>/repos/<o>/<r>/releases/generate-notes, a GitHub-only
+          # endpoint this forge answers with a bare `404 page not found`. The
+          # release step alone then fails, which reads as a release problem
+          # rather than one unsupported flag.
+          files: dist/**/*
